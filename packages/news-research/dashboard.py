@@ -1,3 +1,4 @@
+from content_generator import generate_content
 import streamlit as st
 from pathlib import Path
 from datetime import datetime
@@ -19,7 +20,7 @@ def calculate_score(title):
         "microsoft": 10, "nvidia": 15, "tesla": 12,
         "business": 10, "bisnis": 10, "money": 12, "startup": 12,
         "indonesia": 8, "viral": 15, "robot": 12, "technology": 10,
-        "launch": 10, "future": 8, "price": 8
+        "launch": 10, "future": 8, "price": 8,
     }
 
     lower = title.lower()
@@ -32,6 +33,7 @@ def calculate_score(title):
 
 def detect_category(title):
     lower = title.lower()
+
     if any(x in lower for x in ["ai", "openai", "chatgpt", "robot"]):
         return "🤖 AI & Technology"
     if any(x in lower for x in ["business", "bisnis", "startup", "money"]):
@@ -40,6 +42,7 @@ def detect_category(title):
         return "🇮🇩 Indonesia Trend"
     if any(x in lower for x in ["tesla", "apple", "google", "microsoft", "nvidia"]):
         return "📈 Big Tech"
+
     return "📰 General Trend"
 
 
@@ -51,11 +54,69 @@ def recommended_platforms(score):
     return "Facebook Post, Threads, Short Commentary"
 
 
+def explain_opportunity(title, score):
+    lower = title.lower()
+
+    if score >= 85:
+        return "Topik ini punya peluang viral tinggi karena mengandung keyword kuat dan cocok untuk konten pendek."
+    if "ai" in lower or "technology" in lower or "teknologi" in lower:
+        return "Topik teknologi/AI biasanya menarik untuk audiens global dan cocok untuk edukasi singkat."
+    if "indonesia" in lower or "bisnis" in lower:
+        return "Topik lokal Indonesia bisa menarik untuk audiens regional dan konten bisnis praktis."
+
+    return "Topik ini bisa dijadikan konten ringan, tapi perlu angle yang lebih kuat."
+
+
+def estimate_revenue_potential(score):
+    if score >= 85:
+        return "High"
+    if score >= 70:
+        return "Medium"
+    return "Low"
+
+
+def best_content_format(score):
+    if score >= 85:
+        return "Shorts + Reels + TikTok + Facebook Reels"
+    if score >= 70:
+        return "Shorts + Facebook Post + Threads"
+    return "Facebook Post + Short Commentary"
+
+
+def generate_hook(title):
+    return f"Berita ini kelihatannya biasa, tapi bisa jadi peluang besar: {title}"
+
+
+def generate_thumbnail_concept(title, category):
+    thumbnail_text = "PELUANG BESAR!"
+    if "AI" in category:
+        thumbnail_text = "AI INI BISA MENGUBAH SEMUA!"
+    elif "Business" in category:
+        thumbnail_text = "BISA JADI CUAN!"
+    elif "Indonesia" in category:
+        thumbnail_text = "INDONESIA LAGI NAIK!"
+
+    visual = (
+        "Wajah ekspresif kaget, background warna kontras, ikon uang atau robot, "
+        "judul besar tebal, gaya thumbnail YouTube Shorts modern."
+    )
+
+    prompt = (
+        f"Create a modern YouTube Shorts thumbnail about: {title}. "
+        f"Big bold text: '{thumbnail_text}'. "
+        f"Visual style: {visual} Bright colors, high contrast, viral social media style."
+    )
+
+    return thumbnail_text, visual, prompt
+
+
 def generate_package(article):
     title = article["title"]
     source = article["source"]
     category = article["category"]
     platforms = article["platforms"]
+    hook = generate_hook(title)
+    thumbnail_text, thumbnail_visual, thumbnail_prompt = generate_thumbnail_concept(title, category)
 
     return f"""
 NOFINA CONTENT PACKAGE
@@ -63,15 +124,23 @@ Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}
 Source: {source}
 Category: {category}
 Opportunity Score: {article["score"]}
+Revenue Potential: {estimate_revenue_potential(article["score"])}
+Best Format: {best_content_format(article["score"])}
 Recommended Platforms: {platforms}
 
 ORIGINAL NEWS:
 {title}
 
+OPPORTUNITY REASON:
+{explain_opportunity(title, article["score"])}
+
+MAIN HOOK:
+{hook}
+
 SHORTS SCRIPT:
 
 HOOK:
-Kamu harus tahu berita ini, karena bisa jadi peluang besar.
+{hook}
 
 BODY:
 Hari ini ada kabar penting: {title}
@@ -85,6 +154,13 @@ Lihat ini sebagai peluang konten, peluang bisnis, dan peluang traffic.
 
 CTA:
 Follow Nofina AI Media untuk update peluang teknologi, bisnis, dan tren terbaru.
+
+THUMBNAIL CONCEPT:
+Thumbnail Text: {thumbnail_text}
+Visual: {thumbnail_visual}
+
+THUMBNAIL PROMPT:
+{thumbnail_prompt}
 
 YOUTUBE TITLE OPTIONS:
 1. Berita Ini Bisa Jadi Peluang Besar!
@@ -112,7 +188,6 @@ def parse_articles(content):
     articles = []
     title = ""
     source = ""
-    link = ""
 
     for line in content.splitlines():
         if line.startswith("Source:"):
@@ -122,15 +197,21 @@ def parse_articles(content):
             link = line.replace("Link:", "").strip()
             score = calculate_score(title)
             category = detect_category(title)
+            thumbnail_text, thumbnail_visual, thumbnail_prompt = generate_thumbnail_concept(title, category)
 
-            articles.append({
-                "title": title,
-                "source": source,
-                "link": link,
-                "score": score,
-                "category": category,
-                "platforms": recommended_platforms(score)
-            })
+            articles.append(
+                {
+                    "title": title,
+                    "source": source,
+                    "link": link,
+                    "score": score,
+                    "category": category,
+                    "platforms": recommended_platforms(score),
+                    "thumbnail_text": thumbnail_text,
+                    "thumbnail_visual": thumbnail_visual,
+                    "thumbnail_prompt": thumbnail_prompt,
+                }
+            )
 
         elif line and line[0].isdigit():
             title = line.split(".", 1)[1].strip()
@@ -163,11 +244,23 @@ for index, article in enumerate(articles):
         c2.success(article["platforms"])
         c3.link_button("📖 Read Article", article["link"])
 
+        st.info(explain_opportunity(article["title"], article["score"]))
+        st.write(f"💰 Revenue Potential: **{estimate_revenue_potential(article['score'])}**")
+        st.write(f"🎯 Best Format: **{best_content_format(article['score'])}**")
+
+        st.markdown("#### 🖼 Thumbnail Concept")
+        st.write(f"**Text:** {article['thumbnail_text']}")
+        st.write(f"**Visual:** {article['thumbnail_visual']}")
+
+        with st.expander("View Thumbnail Prompt"):
+            st.code(article["thumbnail_prompt"])
+
         if st.button("🚀 Generate Full Content Package", key=f"pkg_{index}"):
             package = generate_package(article)
 
             safe_name = "".join(
-                char for char in article["title"][:50]
+                char
+                for char in article["title"][:50]
                 if char.isalnum() or char in (" ", "-", "_")
             ).strip().replace(" ", "_")
 
@@ -175,4 +268,4 @@ for index, article in enumerate(articles):
             output_file.write_text(package, encoding="utf-8")
 
             st.success(f"Content package saved: {output_file}")
-            st.text_area("Generated Content Package", package, height=520)
+            st.text_area("Generated Content Package", package, height=620)
